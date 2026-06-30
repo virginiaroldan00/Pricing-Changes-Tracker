@@ -147,13 +147,16 @@
   </div>
 
   <div class="right-panel">
-    <div>
-      <div class="section-title">Revisiones pendientes</div>
-      <div id="reviews-section"></div>
+    <div style="margin-bottom:4px;">
+      <div class="section-title" onclick="toggleReviews()" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+        <span>Revisiones pendientes</span>
+        <span id="reviews-toggle" style="font-size:10px;transition:transform 0.2s;display:inline-block;transform:rotate(180deg);">▲</span>
+      </div>
+      <div id="reviews-section" style="display:none;"></div>
     </div>
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="panel-month-title" id="panel-month-title"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="section-title">Historial</div>
         <select class="city-select" id="city-filter" onchange="renderRightPanel()" style="width:auto;margin:0;padding:6px 10px;font-size:12px;"></select>
       </div>
       <div id="changes-list"></div>
@@ -397,8 +400,6 @@ function renderLegend(){
 // ── RIGHT PANEL ─────────────────────────────────────────────────────────────
 function renderRightPanel(){
   selectedFilter=document.getElementById('city-filter').value;
-  document.getElementById('panel-month-title').textContent=`${MONTH_NAMES[currentMonth]} ${currentYear}`;
-
   renderReviews();
   renderChangesList();
   updateTotalLabel();
@@ -431,95 +432,138 @@ function renderReviews(){
   });
 }
 
+const monthOpenState = {};
+
+function buildChangeCard(ch) {
+  const color = getCityColor(ch.city);
+  const hasReview = !!ch.review;
+  const od = isOverdue(ch.review);
+
+  const card = document.createElement('div');
+  card.className = 'change-card';
+  card.style.marginBottom = '10px';
+
+  const header = document.createElement('div');
+  header.className = 'change-card-header';
+
+  const badge = document.createElement('div');
+  badge.className = 'change-city-badge';
+  const dot = document.createElement('div');
+  dot.style.cssText = `width:10px;height:10px;border-radius:3px;background:${color};flex-shrink:0`;
+  const citySpan = document.createElement('span');
+  citySpan.style.color = color;
+  citySpan.textContent = ch.city;
+  badge.appendChild(dot); badge.appendChild(citySpan);
+
+  const rightSide = document.createElement('div');
+  rightSide.style.cssText = 'display:flex;align-items:center;gap:6px;';
+  const dateSpan = document.createElement('span');
+  dateSpan.className = 'change-date';
+  dateSpan.textContent = formatDate(ch.date);
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon-btn edit'; editBtn.title = 'Editar'; editBtn.textContent = '✎';
+  editBtn.addEventListener('click', () => editChange(ch.id));
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon-btn danger'; delBtn.title = 'Eliminar'; delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => deleteChange(ch.id));
+
+  rightSide.appendChild(dateSpan); rightSide.appendChild(editBtn); rightSide.appendChild(delBtn);
+  header.appendChild(badge); header.appendChild(rightSide);
+
+  const notes = document.createElement('div');
+  notes.className = 'change-notes';
+  notes.textContent = ch.notes;
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  if(hasReview){
+    const b2 = document.createElement('span');
+    b2.className = 'review-badge' + (od ? ' overdue' : '');
+    b2.textContent = '🔔 Rev. ' + formatDate(ch.review);
+    actions.appendChild(b2);
+  }
+  const revBtn = document.createElement('button');
+  revBtn.className = 'btn secondary sm';
+  revBtn.textContent = hasReview ? 'Editar revisión' : '+ Fijar revisión';
+  revBtn.addEventListener('click', () => openReviewModal(ch.id));
+  actions.appendChild(revBtn);
+  if(hasReview){
+    const slackBtn = document.createElement('button');
+    slackBtn.className = 'btn amber sm'; slackBtn.textContent = '📋 Msg Slack';
+    slackBtn.addEventListener('click', () => copySlackMsg(ch.id));
+    actions.appendChild(slackBtn);
+  }
+
+  card.appendChild(header); card.appendChild(notes); card.appendChild(actions);
+  return card;
+}
+
 function renderChangesList(){
-  const monthStr=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;
-  const filtered=changes.filter(c=>c.date.startsWith(monthStr)&&(selectedFilter?c.city===selectedFilter:true));
-  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date));
-  const list=document.getElementById('changes-list');
-  list.innerHTML='';
+  const filtered = changes.filter(c => selectedFilter ? c.city === selectedFilter : true);
+  const sorted = [...filtered].sort((a,b) => b.date.localeCompare(a.date));
+  const list = document.getElementById('changes-list');
+  list.innerHTML = '';
 
-  if(!sorted.length){ list.innerHTML='<div class="empty-state">No hay cambios en este mes.</div>'; return; }
+  if(!sorted.length){ list.innerHTML='<div class="empty-state">No hay cambios registrados.</div>'; return; }
 
-  sorted.forEach(ch=>{
-    const color = getCityColor(ch.city);
-    const hasReview = !!ch.review;
-    const od = isOverdue(ch.review);
+  // Group by year-month
+  const groups = {};
+  sorted.forEach(ch => {
+    const key = ch.date.slice(0,7); // "2026-06"
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(ch);
+  });
 
-    const card = document.createElement('div');
-    card.className = 'change-card';
-    card.style.marginBottom = '10px';
+  const currentMonthKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;
 
-    // Header
-    const header = document.createElement('div');
-    header.className = 'change-card-header';
+  Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(key => {
+    const [y, m] = key.split('-');
+    const label = `${MONTH_NAMES[parseInt(m)-1]} ${y}`;
+    const isOpen = key in monthOpenState ? monthOpenState[key] : false;
+    monthOpenState[key] = isOpen;
 
-    const badge = document.createElement('div');
-    badge.className = 'change-city-badge';
-    const dot = document.createElement('div');
-    dot.style.cssText = `width:10px;height:10px;border-radius:3px;background:${color};flex-shrink:0`;
-    const citySpan = document.createElement('span');
-    citySpan.style.color = color;
-    citySpan.textContent = ch.city;
-    badge.appendChild(dot); badge.appendChild(citySpan);
+    // Section header
+    const section = document.createElement('div');
+    section.style.marginBottom = '12px';
 
-    const rightSide = document.createElement('div');
-    rightSide.style.cssText = 'display:flex;align-items:center;gap:6px;';
-    const dateSpan = document.createElement('span');
-    dateSpan.className = 'change-date';
-    dateSpan.textContent = formatDate(ch.date);
+    const secHeader = document.createElement('div');
+    secHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;user-select:none;';
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'icon-btn edit';
-    editBtn.title = 'Editar';
-    editBtn.textContent = '✎';
-    editBtn.addEventListener('click', () => editChange(ch.id));
+    const secLabel = document.createElement('span');
+    secLabel.style.cssText = 'font-size:13px;font-weight:700;color:var(--text);';
+    secLabel.textContent = label;
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'icon-btn danger';
-    delBtn.title = 'Eliminar';
-    delBtn.textContent = '✕';
-    delBtn.addEventListener('click', () => deleteChange(ch.id));
+    const secCount = document.createElement('span');
+    secCount.style.cssText = 'font-size:11px;color:var(--muted);margin-left:8px;';
+    secCount.textContent = `${groups[key].length} cambio${groups[key].length!==1?'s':''}`;
 
-    rightSide.appendChild(dateSpan);
-    rightSide.appendChild(editBtn);
-    rightSide.appendChild(delBtn);
-    header.appendChild(badge);
-    header.appendChild(rightSide);
+    const secArrow = document.createElement('span');
+    secArrow.style.cssText = 'font-size:10px;color:var(--muted);transition:transform 0.2s;display:inline-block;margin-left:auto;';
+    secArrow.textContent = '▲';
+    if(!isOpen) secArrow.style.transform = 'rotate(180deg)';
 
-    // Notes
-    const notes = document.createElement('div');
-    notes.className = 'change-notes';
-    notes.textContent = ch.notes;
+    const leftSide = document.createElement('div');
+    leftSide.style.display = 'flex'; leftSide.style.alignItems = 'center'; leftSide.style.gap = '6px';
+    leftSide.appendChild(secLabel); leftSide.appendChild(secCount);
+    secHeader.appendChild(leftSide); secHeader.appendChild(secArrow);
 
-    // Actions
-    const actions = document.createElement('div');
-    actions.className = 'card-actions';
+    const secBody = document.createElement('div');
+    secBody.style.display = isOpen ? '' : 'none';
+    groups[key].forEach(ch => secBody.appendChild(buildChangeCard(ch)));
 
-    if(hasReview){
-      const badge2 = document.createElement('span');
-      badge2.className = 'review-badge' + (od ? ' overdue' : '');
-      badge2.textContent = '🔔 Rev. ' + formatDate(ch.review);
-      actions.appendChild(badge2);
-    }
+    secHeader.addEventListener('click', () => {
+      const open = secBody.style.display === 'none';
+      secBody.style.display = open ? '' : 'none';
+      secArrow.style.transform = open ? '' : 'rotate(180deg)';
+      monthOpenState[key] = open;
+    });
 
-    const revBtn = document.createElement('button');
-    revBtn.className = 'btn secondary sm';
-    revBtn.textContent = hasReview ? 'Editar revisión' : '+ Fijar revisión';
-    revBtn.addEventListener('click', () => openReviewModal(ch.id));
-    actions.appendChild(revBtn);
-
-    if(hasReview){
-      const slackBtn = document.createElement('button');
-      slackBtn.className = 'btn amber sm';
-      slackBtn.textContent = '📋 Msg Slack';
-      slackBtn.addEventListener('click', () => copySlackMsg(ch.id));
-      actions.appendChild(slackBtn);
-    }
-
-    card.appendChild(header);
-    card.appendChild(notes);
-    card.appendChild(actions);
-    list.appendChild(card);
+    section.appendChild(secHeader);
+    section.appendChild(secBody);
+    list.appendChild(section);
   });
 }
 
@@ -698,6 +742,16 @@ function importData(event){
     event.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// ── REVISIONES TOGGLE ────────────────────────────────────────────────────────
+let reviewsOpen = false;
+function toggleReviews(){
+  reviewsOpen = !reviewsOpen;
+  const sec = document.getElementById('reviews-section');
+  const arrow = document.getElementById('reviews-toggle');
+  sec.style.display = reviewsOpen ? '' : 'none';
+  arrow.style.transform = reviewsOpen ? '' : 'rotate(180deg)';
 }
 
 // Close on backdrop
