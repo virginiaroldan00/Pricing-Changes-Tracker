@@ -126,8 +126,11 @@
 
 <header>
   <div class="logo"><span class="bolt">Bolt</span> Pricing Tracker</div>
-  <div style="display:flex;align-items:center;gap:12px;">
+  <div style="display:flex;align-items:center;gap:10px;">
     <span class="subtitle" id="total-label"></span>
+    <button class="btn secondary" onclick="exportData()" title="Exportar datos">⬇ Exportar</button>
+    <button class="btn secondary" onclick="document.getElementById('import-input').click()" title="Importar datos">⬆ Importar</button>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
     <button class="btn" onclick="openAddModal()">+ Añadir cambio</button>
   </div>
 </header>
@@ -239,10 +242,23 @@ const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','A
 const DAY_NAMES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
 const SEED_DATA = [
-  { id:'s1', city:'Alicante', date:'2026-05-06', review:'', notes:'He aumentado los slots de peak hours añadiendo entre semana y modificado los del fin de semana añadiendo también los domingos. Eran slots donde más demanda había, con un search coverage más bajo y ATA altos.\n\nWeekdays: +10% (sobre precio general)\nWeekend: +27% (sobre precio general)' },
-  { id:'s2', city:'Valencia', date:'2026-05-06', review:'', notes:'Misma lógica que Alicante — aumento de peak hours entre semana y fin de semana incluyendo domingos. Slots de alta demanda con search coverage bajo y ATA altos.\n\nWeekdays: +9.4% (sobre precio base)\nWeekend: +32% (sobre precio base)' },
-  { id:'s3', city:'Coruña', date:'2026-04-30', review:'', notes:'En general, la utilización no es muy alta. Hay un gap claro de mejora a revisar con DC.\n\nWeekdays:\n• Lunes a viernes (7:00–8:00): baja conversión → -12%\n• Lunes a jueves (15:00–18:00): ampliado y bajado → -12%\n• Lunes a jueves (23:00): añadido como peak hour\n\nWeekend:\n• Sábado y domingo (00:00–07:30): ampliado, utilización ~55% → -11%\n• Viernes a domingo (15:00–23:00): baja conversión → -11%' },
-  { id:'s4', city:'Zaragoza', date:'2026-04-29', review:'', notes:'Peak hours entre semana: -8%.\nJueves: peak hour empieza 1h más tarde (14:00 → 15:00).\nFin de semana 00:00–08:00: ligero aumento de price/min.\nFin de semana y viernes por las tardes: -15% porque no estábamos convirtiendo.' }
+  {"id":"s1","city":"Alicante","date":"2026-05-06","review":"","notes":"He aumentado los slots de peak hours añadiendo entre semana y modificado los del fin de semana añadiendo también los domingos. Eran slots donde más demanda había, con un search coverage más bajo y ATA altos.\n\nWeekdays: +10% (sobre precio general)\nWeekend: +27% (sobre precio general)"},
+  {"id":"s2","city":"Valencia","date":"2026-05-06","review":"","notes":"Misma lógica que Alicante — aumento de peak hours entre semana y fin de semana incluyendo domingos. Slots de alta demanda con search coverage bajo y ATA altos.\n\nWeekdays: +9.4% (sobre precio base)\nWeekend: +32% (sobre precio base)"},
+  {"id":"s3","city":"Coruña","date":"2026-04-30","review":"","notes":"En general, la utilización no es muy alta. Hay un gap claro de mejora a revisar con DC.\n\nWeekdays:\n• Lunes a viernes (7:00–8:00): baja conversión → -12%\n• Lunes a jueves (15:00–18:00): ampliado y bajado → -12%\n• Lunes a jueves (23:00): añadido como peak hour\n\nWeekend:\n• Sábado y domingo (00:00–07:30): ampliado, utilización ~55% → -11%\n• Viernes a domingo (15:00–23:00): baja conversión → -11%"},
+  {"id":"s4","city":"Zaragoza","date":"2026-04-29","review":"","notes":"Peak hours entre semana: -8%.\nJueves: peak hour empieza 1h más tarde (14:00 → 15:00).\nFin de semana 00:00–08:00: ligero aumento de price/min.\nFin de semana y viernes por las tardes: -15% porque no estábamos convirtiendo."},
+  {"id":"ch-1779370250518","city":"Zaragoza","date":"2026-05-21","notes":"De lunes a miércoles he reducido de un 8% a +4% sobre tarifa base\nDomingos de 00 - 8am de 52% a 32% sobre tarifa base","review":"2026-06-10"},
+  {"id":"ch-1779441523234","city":"Alicante","date":"2026-05-22","notes":"Se redujo el demand spend de 20 a 8% generando una caida del EPH del 18% se ha aumentado el garantizado (supply spend) un 6,6%","review":"2026-05-29"},
+  {"id":"ch-1779964151043","city":"Toledo","date":"2026-05-28","notes":"Aumento del 15% por el corpus christi Viernes sabado y semana que viene miercoles a domingo","review":"2026-06-04"},
+  {"id":"ch-1780477162762","city":"Toledo","date":"2026-06-03","notes":"Guadalajara - Aumento de precios un 12/14% precio base y un +3.4% en peak hours\n\nPor las multas y compensar el que los coches no se quieran conectar","review":"2026-06-10"},
+  {"id":"ch-1780482869081","city":"Coruña","date":"2026-06-03","notes":"Podríamos plantear bajar el override en Coruña: 8km a 5km\n\nGoal-->  bajar ETAs, aumentar aceptación y S2O","review":"2026-06-10"},
+  {"id":"ch-1780502685913","city":"Alicante","date":"2026-06-03","notes":"Bajada de precios en PH","review":"2026-06-10"},
+  {"id":"ch-1781277346425","city":"Alicante","date":"2026-06-15","notes":"SR Se ha desactivado benidorm y torrevieja","review":"2026-06-22"},
+  {"id":"ch-1781792515230","city":"Alicante","date":"2026-06-23","notes":"San Juan","review":""},
+  {"id":"ch-1781792530410","city":"Valencia","date":"2026-06-23","notes":"SAN JUAN","review":""},
+  {"id":"ch-1781792539085","city":"Coruña","date":"2026-06-23","notes":"SAN JUAN","review":""},
+  {"id":"ch-1782312268139","city":"Sevilla","date":"2026-06-24","notes":"Reducción PH:\n* -13% vs versión anterior (de estar a un 35% s/total a 19%)\n* 17% a un 9% (noche del viernes) \n\nQueremos ver si estasmo consiguiendo aumentar S2O pero sin afectar acceptance rate (si me he pasado diria que es en el del 9%) - la bajada ha sido en el min price estaba en 12€ lo baje a 9€","review":"2026-07-01"},
+  {"id":"ch-1782461224546","city":"Alicante","date":"2026-06-26","notes":"Añadimos el aumento de precio comentado con Emmanuel","review":"2026-07-03"},
+  {"id":"ch-1782461252679","city":"Valencia","date":"2026-06-26","notes":"Añadimos cambio cometnado con Emmanuele","review":"2026-07-03"}
 ];
 
 let changes = loadData();
@@ -253,7 +269,13 @@ let colorCache = {};
 let reviewTargetId = null;
 
 function loadData() {
-  try { const r = localStorage.getItem(STORAGE_KEY); if(r) return JSON.parse(r); } catch(e){}
+  try {
+    const r = localStorage.getItem(STORAGE_KEY);
+    if(r) {
+      const parsed = JSON.parse(r);
+      if(parsed.length > SEED_DATA.length) return parsed;
+    }
+  } catch(e){}
   return SEED_DATA.map(d=>({...d}));
 }
 function saveData() {
@@ -642,6 +664,41 @@ function updateCityFilter(){
 }
 
 function updateAll(){ updateCityFilter(); renderLegend(); renderCalendar(); renderRightPanel(); }
+
+// ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+function exportData(){
+  const json = JSON.stringify(changes, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'pricing-tracker-data.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if(!Array.isArray(imported)) throw new Error('Formato inválido');
+      if(!confirm(`¿Importar ${imported.length} cambios? Esto reemplazará los datos actuales.`)) return;
+      changes = imported;
+      saveData();
+      updateAll();
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#34D186;color:#000;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;z-index:999;';
+      toast.textContent = `✓ ${imported.length} cambios importados`;
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(), 3000);
+    } catch(err) {
+      alert('Error al importar: ' + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
 
 // Close on backdrop
 document.getElementById('add-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget)closeAddModal(); });
